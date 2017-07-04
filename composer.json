@@ -1,0 +1,39 @@
+{
+    "name": "halumein/yii2-balance",
+    "description": "its a balance module",
+    "keywords": ["yii2", "yii 2", "application", "balance",  "module", "halumein"],
+    "homepage": "https://github.com/halumein/yii2-balance",
+    "type": "yii2-extension",
+    "license": "BSD-3-Clause",
+    "support": {
+        "source": "https://github.com/halumein/yii2-balance"
+    },
+    "authors": [
+        {
+            "name": "Komarov Vlad",
+            "email": "halumein@mail.ru"
+        }
+    ],
+    "minimum-stability": "dev",
+	"prefer-stable" : true,
+    "require": {
+        "php": ">=5.4.0",
+        "yiisoft/yii2": "*",
+        "yiisoft/yii2-bootstrap": "*"
+    },
+    "require-dev": {
+        "yiisoft/yii2-debug": "*",
+        "yiisoft/yii2-gii": "*"
+    },
+    "config": {
+        "process-timeout": 1800
+    },
+    "autoload": {
+        "psr-4": {
+            "halumein\\balance\\": ""
+        }
+    },
+    "extra": {
+        "bootstrap": "halumein\\balance\\Bootstrap"
+    }
+}
