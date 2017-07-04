@@ -28,46 +28,107 @@ class Balance extends Component{
 		return $userScore = Score::find()->where(['user_id' => Yii::$app->user->id])->one();
 	}
 
-	public function addFunds($balanceId, $amount, $refillType, $comment = null)
+	/**
+	* Пополнение кошелька
+	* $balanceId - ид кошелька
+	* $amount - сумма пополнения
+	* $refillType - тип пополнения - любая строка, например "начисление через платёжную систему"
+	* $ident - идентификатор пачки - любая строка, например номер платёжного поручения или название акции
+	* $comment - комментарий
+	*/
+
+	public function addFunds($balanceId, $amount, $refillType, $ident, $comment = null)
 	{
 		$additionalData = [
 			'refillType' => $refillType,
 			'comment' => $comment,
 		];
+		// добавляем транзакцию
 		$tranasaction = $this->addTransaction($balanceId, 'in', $amount, $additionalData);
 		if ($tranasaction) {
-			// $balanceId, $tranasctionId, $amount, $ident
-			// TODO 
+			// добавляем пачку
 			$this->addIncomePack($balanceId, $tranasaction->id, $amount, $ident);
 		}
 	}
 
-	public function removeFunds($balanceId, $amount, $refillType, $comment = null)
+	/**
+	*	Списание средств с кошелька
+	* 	$balanceId - ид кошелька
+	* 	$amount - сумма пополнения
+	* 	$refillType - тип пополнения - любая строка, например "начисление через платёжную систему"
+	* 	$ident - идентификатор пачки - любая строка, например номер платёжного
+	*   поручения или название акции. если не передан - списание будет с наиболее раннего
+	* 	$comment - комментарий
+	*/
+	public function removeFunds($balanceId, $amount, $refillType, $ident = null, $comment = null)
 	{
-		// находим все пачки прихода средств что бы начать списывать с наиболее ранней
-		$incomePacks = IncomePack::find()
-						->where(['balance_id' => $balanceId])
-						->andWhere(['>', 'balance', 0])
-						->orderBy(['id' => SORT_ASC])
-						->all();
 
-		$balance = $amount;
+		while ($amount > 0) {
+			// находим наиболее раннюю пачку, списывать будем с нее
+			$pack = $this->getEarliestPack($balanceId);
 
-		// начинаем списывать
-		foreach ($incomePacks as $key => $pack) {
-
-			if ($pack->balance - $amount < 0) {
-
+			if (!$pack) {
+				return [
+					'status' => 'error',
+					'error' => "нет средств для списания остатка $amount"
+				];
 			}
+
+			$additionalData = [
+				'refillType' => $refillType,
+				'comment' => $comment,
+				'packId' => $pack->id,
+			];
+
+			if ($pack->balance >= $amount ) {
+				// если в пачке сумма больше или равна сумме списания - списываем сумму списания
+				$pack->balance = $pack->balance - $amount;
+				$transactionAmount = $amount;
+				$amount = 0;
+			} else {
+				// если в пачке сумма меньше суммы списания - списываем сумму в
+				// пачке (до нуля) и остаток списываем со следующей пачки
+				$transactionAmount = $pack->balance;
+				$pack->balance = 0;
+				$amount = $amount - $pack->balance;
+			}
+
+			$this->addTransaction($balanceId, 'out', $transactionAmount, $additionalData);
+			$pack->update;
 
 		}
 
-		$additionalData = [
-			'refillType' => $refillType,
-			'comment' => $comment,
-			'packId' => $comment,
-		];
+
 		return $this->addTransaction($balanceId, 'out', $amount, $additionalData);
+	}
+
+	public function removeAllFundsFromPack($packIdent, $reason)
+	{
+		$pack = IncomePack::find()
+				->where(['ident' => $packIdent])
+				->one();
+
+		if ($pack) {
+			if ($pack->balance == 0) {
+				return true;
+			}
+
+			$additionalData = [
+				'refillType' => $reason,
+				'packId' => $pack->id,
+			];
+
+			$amount = $pack->balance;
+
+			$this->addTransaction($pack->balanceId, 'out', $amount, $additionalData);
+			$pack->balance = 0;
+			$pack->update();
+
+			return true;
+		}
+		
+		return false;
+
 	}
 
 	public function revertTransaction($transactionId, $comment = null)
@@ -138,6 +199,16 @@ class Balance extends Component{
 			return $model->getErrors();
 		}
 	}
+
+	protected function getEarliestPack($balanceId)
+	{
+		return IncomePack::find()
+						->where(['balance_id' => $balanceId])
+						->andWhere(['>', 'balance', 0])
+						->orderBy(['id' => SORT_ASC])
+						->one();
+	}
+
 
 
 
