@@ -42,7 +42,7 @@ php yii migrate --migrationPath=vendor/halumein/yii2-balance/migrations
 	...
 	]
 ```
-Для доступа к компоненту (в данном модуле - для совершения) в том же конфиге необходимо подключить обращение:
+Подключить компонент:
 ```'php'
 	'components' => [
 	...
@@ -53,20 +53,14 @@ php yii migrate --migrationPath=vendor/halumein/yii2-balance/migrations
 	]
 ```
 
-Если данный модуль предполагается использовать совместно с модулем yii2-partnership, то в конфиге к модулю partnership необходимо подписаться на событие совершения операции перевода данного модуля:
-```php
-'partnership' => [
-            'class' => 'halumein\partnership\Module',
-            'layout' => 'main',
-			'adminRoles' => ['superadmin', 'administrator'],
-				'on makePayment' => function($event){
-					$model = $event->model;
-					$userId = Yii::$app->Partnership->getUserByPartnerId($model->partner_id);
-					$balance = Yii::$app->balance->getUserScore($userId);
-					Yii::$app->balance->addTransaction($balance->id, 'in', $model->sum, 'partnership rewads');
-				}
-],
+Доступные следующие методы (подробнее см. компонент balance):
 ```
+	// начислить 500 баллов на кошелёк с id 12
+	\Yii::$app->balance->addFounds(12, 500, 'Начисление бонусных баллов по акции', 123456);
+	\Yii::$app->balance->removeFounds(12, 250, 'Оплата заказа 1234125');
+
+```
+
 Для того, чтобы кошелек автоматически создавался для пользователя нужно модифицировать стандартную модель 'User'(commmon\models\User) следующим образом:
 
 ```'php'
@@ -80,7 +74,7 @@ use halumein\balance\models\Score;
 			$userBalance = new Score;
 			$userBalance->user_id = $this->getId();
 			$userBalance->balance = 0;
-			
+
 			if($userBalance->validate()){
 				return $userBalance->save();
 			} else die('Uh-oh, somethings went wrong!');
@@ -102,7 +96,7 @@ public function getScore($userId = null)
 Для облегчения переходов и информатирования пользователя о количестве баланса предусмотренны следующие виджеты:
 ```'php'
 <?php
-use halumein\balance\widgets\BalanceWidget;			 //Виджет для вывода пользователю его баланса со ссылкой на историю его транзакций 
+use halumein\balance\widgets\BalanceWidget;			 //Виджет для вывода пользователю его баланса со ссылкой на историю его транзакций
 use halumein\balance\widgets\ScoreButtonWidget;		 //Виджет для перехода на страницу кошельков
 use halumein\balance\widgets\TransactionButtonWidget; //Виджет для перехода на страницу транзакций
 ...
