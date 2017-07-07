@@ -3,7 +3,7 @@
 use yii\db\Schema;
 use yii\db\Migration;
 
-class m170703_091812_create_table_balance_pack extends Migration
+class m170703_093212_alter_table_balance_tranasction extends Migration
 {
 
     public function safeUp()

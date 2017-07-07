@@ -62,7 +62,6 @@ class Balance extends Component{
 	*/
 	public function removeFunds($balanceId, $amount, $refillType, $ident = null, $comment = null)
 	{
-
 		while ($amount > 0) {
 			// находим наиболее раннюю пачку, списывать будем с нее
 			$pack = $this->getEarliestPack($balanceId);
@@ -80,26 +79,24 @@ class Balance extends Component{
 				'packId' => $pack->id,
 			];
 
-			if ($pack->balance >= $amount ) {
+			if ($pack->current_balance >= $amount ) {
 				// если в пачке сумма больше или равна сумме списания - списываем сумму списания
-				$pack->balance = $pack->balance - $amount;
+				$pack->current_balance = $pack->current_balance - $amount;
 				$transactionAmount = $amount;
 				$amount = 0;
 			} else {
 				// если в пачке сумма меньше суммы списания - списываем сумму в
 				// пачке (до нуля) и остаток списываем со следующей пачки
-				$transactionAmount = $pack->balance;
-				$pack->balance = 0;
-				$amount = $amount - $pack->balance;
+				$transactionAmount = $pack->current_balance;
+				$pack->current_balance = 0;
+				$amount = $amount - $pack->current_balance;
 			}
 
 			$this->addTransaction($balanceId, 'out', $transactionAmount, $additionalData);
-			$pack->update;
-
+			$pack->update();
 		}
 
-
-		return $this->addTransaction($balanceId, 'out', $amount, $additionalData);
+		return true;
 	}
 
 	public function removeAllFundsFromPack($packIdent, $reason)
@@ -109,7 +106,8 @@ class Balance extends Component{
 				->one();
 
 		if ($pack) {
-			if ($pack->balance == 0) {
+
+			if ($pack->current_balance == 0) {
 				return true;
 			}
 
@@ -118,15 +116,16 @@ class Balance extends Component{
 				'packId' => $pack->id,
 			];
 
-			$amount = $pack->balance;
+			$amount = $pack->current_balance;
 
-			$this->addTransaction($pack->balanceId, 'out', $amount, $additionalData);
-			$pack->balance = 0;
+			$this->addTransaction($pack->balance_id, 'out', $amount, $additionalData);
+			$pack->current_balance = 0;
 			$pack->update();
 
 			return true;
+			
 		}
-		
+
 		return false;
 
 	}
@@ -194,9 +193,10 @@ class Balance extends Component{
 		$score->update();
 
 		if($model->save()){
-			return $model->id;
+			return $model;
 		} else {
-			return $model->getErrors();
+			// return $model->getErrors();
+			return false;
 		}
 	}
 
@@ -204,7 +204,7 @@ class Balance extends Component{
 	{
 		return IncomePack::find()
 						->where(['balance_id' => $balanceId])
-						->andWhere(['>', 'balance', 0])
+						->andWhere(['>', 'current_balance', 0])
 						->orderBy(['id' => SORT_ASC])
 						->one();
 	}
@@ -226,7 +226,6 @@ class Balance extends Component{
 		$incomePack->source_transaction_id = $tranasctionId;
 		$incomePack->date_created = date("Y-m-d");
 		$incomePack->date_updated = date("Y-m-d");
-
 		return $incomePack->save();
 
 	}
