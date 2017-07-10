@@ -88,8 +88,8 @@ class Balance extends Component{
 				// если в пачке сумма меньше суммы списания - списываем сумму в
 				// пачке (до нуля) и остаток списываем со следующей пачки
 				$transactionAmount = $pack->current_balance;
-				$pack->current_balance = 0;
 				$amount = $amount - $pack->current_balance;
+				$pack->current_balance = 0;
 			}
 
 			$this->addTransaction($balanceId, 'out', $transactionAmount, $additionalData);
