@@ -63,8 +63,14 @@ class Balance extends Component{
 	public function removeFunds($balanceId, $amount, $refillType, $ident = null, $comment = null)
 	{
 		while ($amount > 0) {
-			// находим наиболее раннюю пачку, списывать будем с нее
-			$pack = $this->getEarliestPack($balanceId);
+
+			// если нужно списать с конкретной пачки
+			if ($ident) {
+				$pack = $this->getPackByIdent($ident);
+			} else {
+				// находим наиболее раннюю пачку, списывать будем с нее
+				$pack = $this->getEarliestPack($balanceId);
+			}
 
 			if (!$pack) {
 				return [
@@ -106,11 +112,9 @@ class Balance extends Component{
 				->one();
 
 		if ($pack) {
-
 			if ($pack->current_balance == 0) {
 				return true;
 			}
-
 			$additionalData = [
 				'refillType' => $reason,
 				'packId' => $pack->id,
@@ -123,7 +127,7 @@ class Balance extends Component{
 			$pack->update();
 
 			return true;
-			
+
 		}
 
 		return false;
@@ -136,8 +140,35 @@ class Balance extends Component{
 
 		if ($transaction) {
 			// опеределяем обратную операцию
-			$type = $transaction->type == 'in' ? 'in' : 'out';
-			$this->addTransaction($transaction->balanceId, $type, $transaction->amount, $transaction->pack_id, 'Отмена транзакции '.$transaction->id, $comment);
+
+			// если был приход - то начинаем списание с пачки прихода
+			if ($transaction->type == 'in') {
+				$pack = IncomePack::find()
+						->where(['source_transaction_id' => $transaction->id])
+						->one();
+				$this->removeFunds($transaction->balance_id, $transaction->amount, 'Отмена транзакции '. $transaction->id, $pack->ident, $comment);
+			} else {
+
+				// если списание - то находим пачку с которой списывали
+				$pack = IncomePack::findOne($transaction->pack_id);
+				// и возвращаем в нее списанную сумму
+				$pack->current_balance = $pack->current_balance + $transaction->amount;
+				$pack->update();
+
+				// и проводим транзакцию
+
+				$additionalData = [
+					'refillType' => 'отмена транзакции ' . $transaction->id,
+					'comment' => $comment,
+					'packId' => $transaction->pack_id,
+				];
+
+				$this->addTransaction($transaction->balance_id, 'in', $transaction->amount, $additionalData);
+			}
+
+			$transaction->canceled = date('Y-m-d H:i:s');
+			$transaction->update();
+
 		} else {
 			return [
 				'status' => 'error',
@@ -163,6 +194,7 @@ class Balance extends Component{
 		$model->balance_id = $balanceId;
 		$model->type = $type;
 		$model->amount = $amount;
+
 		if (isset($additionalData['refillType'])) {
 			$model->refill_type = $additionalData['refillType'];
 		}
@@ -209,11 +241,15 @@ class Balance extends Component{
 						->one();
 	}
 
-
-
+	protected function getPackByIdent($ident)
+	{
+		return IncomePack::find()
+						->where(['ident' => $ident])
+						->one();
+	}
 
 	/**
-	*
+	*	Добавляет входящую пачку
 	*/
 	protected function addIncomePack($balanceId, $tranasctionId, $amount, $ident)
 	{
