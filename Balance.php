@@ -139,6 +139,12 @@ class Balance extends Component{
 		$transaction = Transaction::findOne($transactionId);
 
 		if ($transaction) {
+
+			if ($transaction->canceled != null) {
+				return [
+					'status' => 'success',
+				];
+			}
 			// опеределяем обратную операцию
 
 			// если был приход - то начинаем списание с пачки прихода
@@ -168,6 +174,10 @@ class Balance extends Component{
 
 			$transaction->canceled = date('Y-m-d H:i:s');
 			$transaction->update();
+
+			return [
+				'status' => 'success',
+			];
 
 		} else {
 			return [
